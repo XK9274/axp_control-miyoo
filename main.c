@@ -5,6 +5,25 @@
 #include <unistd.h>
 #include <string.h>
 
+// set wifi
+void set_wifi(int file, int wifi_on) {
+  char register_addresses[] = { 0x12, 0x56, 0x78, 0x79, 0x7C, 0x7D };
+  char wifi_on_values[] = { 0xD8, 0xB5, 0xDA, 0x07, 0x1B, 0x03 };
+  char wifi_off_values[] = { 0xC0, 0xB4, 0xDB, 0x08, 0x15, 0x01 };
+
+  char *values = wifi_on ? wifi_on_values : wifi_off_values;
+
+  for (int i = 0; i < sizeof(register_addresses); i++) {
+    char buf[2] = { register_addresses[i], values[i] };
+    if (write(file, buf, 2) != 2) {
+      perror("Failed to write to the device");
+      return;
+    }
+  }
+
+  printf("WiFi %s\n", wifi_on ? "enabled" : "disabled");
+}
+
 void read_all_registers(int file) { // pulled a bunch of registers off the axp document
   char registers[] = {
   0x00, 0x01, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 
@@ -38,10 +57,11 @@ void read_all_registers(int file) { // pulled a bunch of registers off the axp d
 }
 
 int main(int argc, char *argv[]) {
-  if (argc < 2 || (strcmp(argv[1], "shutdown") != 0 && strcmp(argv[1], "acin") != 0 && strcmp(argv[1], "charging") != 0 && strcmp(argv[1], "read") != 0)) {
-    fprintf(stderr, "Usage: %s [shutdown|acin|charging|read] [-f filename]\n", argv[0]); // can print to file for the read command
-    return -1;
-  }
+    if (argc < 2 || (strcmp(argv[1], "shutdown") != 0 && strcmp(argv[1], "acin") != 0 && strcmp(argv[1], "charging") != 0 && strcmp(argv[1], "read") != 0 && strcmp(argv[1], "wifi") != 0)) {
+      fprintf(stderr, "Usage: %s [shutdown|acin|charging|read|wifi] [-f filename] [on|off]\n", argv[0]); // can print to file for the read command
+      return -1;
+    }
+
 
   FILE *outputFile = stdout;
   if (argc == 4 && strcmp(argv[2], "-f") == 0) {
@@ -73,6 +93,22 @@ int main(int argc, char *argv[]) {
       fflush(stdout);
       dup2(tmp_stdout, STDOUT_FILENO);
       close(tmp_stdout);
+    }
+  }
+  
+  if (strcmp(argv[1], "wifi") == 0) {
+    if (argc < 3) {
+      fprintf(stderr, "Usage: %s wifi [on|off]\n", argv[0]);
+      return -1;
+    }
+
+    if (strcmp(argv[2], "on") == 0) {
+      set_wifi(file, 1);
+    } else if (strcmp(argv[2], "off") == 0) {
+      set_wifi(file, 0);
+    } else {
+      fprintf(stderr, "Unknown WiFi command. Use 'on' or 'off'\n");
+      return -1;
     }
   }
 
