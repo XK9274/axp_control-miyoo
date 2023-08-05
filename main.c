@@ -5,20 +5,29 @@
 #include <unistd.h>
 #include <string.h>
 
-// set wifi
+#include <stdio.h>
+
 void set_wifi(int file, int wifi_on) {
-  char register_addresses[] = { 0x12, 0x56, 0x78, 0x79, 0x7C, 0x7D };
-  char wifi_on_values[] = { 0xD8, 0xB5, 0xDA, 0x07, 0x1B, 0x03 };
-  char wifi_off_values[] = { 0xC0, 0xB4, 0xDB, 0x08, 0x15, 0x01 };
+  char register_address = 0x12;
+  char value;
+  
+  // Read the value from address 0x12
+  if (write(file, &register_address, 1) != 1 || read(file, &value, 1) != 1) {
+    perror("Failed to read from the device");
+    return;
+  }
 
-  char *values = wifi_on ? wifi_on_values : wifi_off_values;
+  // Modify the value based on the wifi_on flag
+  if (wifi_on) {
+    value = value | 0x18; // Logical OR to enable WiFi
+  } else {
+    value = value & ~0x18; // Logical AND with the complement of 0x18 to disable WiFi
+  }
 
-  for (int i = 0; i < sizeof(register_addresses); i++) {
-    char buf[2] = { register_addresses[i], values[i] };
-    if (write(file, buf, 2) != 2) {
-      perror("Failed to write to the device");
-      return;
-    }
+  char buf[2] = { register_address, value };
+  if (write(file, buf, 2) != 2) {
+    perror("Failed to write to the device");
+    return;
   }
 
   printf("WiFi %s\n", wifi_on ? "enabled" : "disabled");
