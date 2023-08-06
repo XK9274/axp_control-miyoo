@@ -1,7 +1,7 @@
 # axp_control-miyoo
 Test app for communicating with axp223
 
-Usage: %s [shutdown|acin|charging|read] [-f filename] [wifi - on|off]\n
+Usage: %s [shutdown|acin|charging|read|wifi on|off|chgled 0|1|2]
 
 read:
 <details>
