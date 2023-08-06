@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #define CHGLED_REG 0x32 // Shutdown, battery detection, CHGLED control
 #define ACIN_REG 0x48 // 48 IRQ status register 1 R/W 00H
@@ -30,7 +31,7 @@ void axp_write(int file, char regAddr, char regValue) {
   }
 }
 
-void set_chg_led(int file, unsigned char val) {
+void set_chg_led(int file, unsigned char val) { // gecko found this
     unsigned char current_val;
     switch (val) {
     case 2:
@@ -144,23 +145,6 @@ void set_wifi(int file, int wifi_on) { // wifi control registers courtesy of gec
 }
 
 int main(int argc, char *argv[]) {
-    char regAddr;
-    char regValue;
-    if (argc < 2 || (strcmp(argv[1], "shutdown") != 0 && strcmp(argv[1], "acin") != 0 && strcmp(argv[1], "charging") != 0 && strcmp(argv[1], "read") != 0 && strcmp(argv[1], "wifi") != 0)) {
-      fprintf(stderr, "Usage: %s [shutdown|acin|charging|read|wifi] [-f filename] [on|off]\n", argv[0]); // can print to file for the read command
-      return -1;
-    }
-
-
-  FILE *outputFile = stdout;
-  if (argc == 4 && strcmp(argv[2], "-f") == 0) {
-    outputFile = fopen(argv[3], "w");
-    if (outputFile == NULL) {
-      perror("Failed to open output file");
-      return -1;
-    }
-  }
-
   int file = open("/dev/i2c-1", O_RDWR);
   if (file < 0) {
     perror("Failed to open the bus");
@@ -172,49 +156,41 @@ int main(int argc, char *argv[]) {
     return -1;
   }
 
-  if (strcmp(argv[1], "read") == 0) {
-    read_all_registers(file);
-    if (outputFile != stdout) {
-      int tmp_stdout = dup(fileno(stdout));
-      fflush(stdout);
-      dup2(fileno(outputFile), STDOUT_FILENO);
-      read_all_registers(file);
-      fflush(stdout);
-      dup2(tmp_stdout, STDOUT_FILENO);
-      close(tmp_stdout);
-    }
+  if (argc < 2 || (strcmp(argv[1], "shutdown") != 0 && strcmp(argv[1], "acin") != 0 && strcmp(argv[1], "charging") != 0 && strcmp(argv[1], "read") != 0 && strcmp(argv[1], "wifi") != 0 && strcmp(argv[1], "chgled") != 0)) {
+    fprintf(stderr, "Usage: %s [shutdown|acin|charging|read|wifi on|off|chgled 0|1|2]\n", argv[0]);
+    return -1;
   }
-  
-  
-  if (strcmp(argv[1], "wifi") == 0) {
-    if (argc < 3) {
+
+  if (strcmp(argv[1], "shutdown") == 0) {
+    send_shutdown_command(file);
+  } else if (strcmp(argv[1], "acin") == 0) {
+    check_acin_status(file);
+  } else if (strcmp(argv[1], "charging") == 0) {
+    check_charging_status(file);
+  } else if (strcmp(argv[1], "wifi") == 0) {
+    if (argc < 3 || (strcmp(argv[2], "on") != 0 && strcmp(argv[2], "off") != 0)) {
       fprintf(stderr, "Usage: %s wifi [on|off]\n", argv[0]);
       return -1;
     }
-
-    if (strcmp(argv[2], "on") == 0) {
-      set_wifi(file, 1);
-    } else if (strcmp(argv[2], "off") == 0) {
-      set_wifi(file, 0);
-    } else {
-      fprintf(stderr, "Unknown WiFi command. Use 'on' or 'off'\n");
+    set_wifi(file, strcmp(argv[2], "on") == 0);
+  } else if (strcmp(argv[1], "chgled") == 0) {
+    if (argc < 3) {
+      fprintf(stderr, "Usage: %s chgled [0|1|2]\n", argv[0]);
       return -1;
     }
-  }
 
+    int val = atoi(argv[2]);
+    if (val < 0 || val > 2) {
+      fprintf(stderr, "Invalid value for chgled command. Use 0, 1, or 2.\n");
+      return -1;
+    }
 
-   if (strcmp(argv[1], "shutdown") == 0) {
-    send_shutdown_command(file);
-  }
-  else if (strcmp(argv[1], "acin") == 0) {
-    check_acin_status(file);
-  }
-  else if (strcmp(argv[1], "charging") == 0) {
-    check_charging_status(file);
-  }
-
-  if (outputFile != stdout) {
-    fclose(outputFile);
+    set_chg_led(file, val);
+  } else if (strcmp(argv[1], "read") == 0) {
+    read_all_registers(file);
+  } else {
+    fprintf(stderr, "Unknown command\n");
+    return -1;
   }
 
   close(file);
