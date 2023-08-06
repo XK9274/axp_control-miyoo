@@ -6,6 +6,7 @@ Usage: %s [shutdown|acin|charging|read] [-f filename] [wifi - on|off]\n
 read:
 <details>
 mnt/SDCARD # axp_control read
+```
 Register 0x00: 0x01
   Bits: 1, 0, 0, 0, 0
 Register 0x01: 0x30
@@ -185,4 +186,5 @@ Register 0xE9: 0x00
 Register 0xEC: 0x00
   Bits: 0, 0, 0, 0, 0
 /mnt/SDCARD #
+```
 </details>
