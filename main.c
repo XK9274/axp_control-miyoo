@@ -10,6 +10,7 @@
 #define CHGLED_REG 0x32 // Shutdown, battery detection, CHGLED control
 #define ACIN_REG 0x48 // 48 IRQ status register 1 R/W 00H
 #define CHARGE_REG 0x49 // 49 IRQ status register 2 R/W 00H
+#define BATT_L_REG 0xB9 // REG B9 batt level indicator
 #define WIFI_REG 0x12 // ELDO2
 
 char axp_read(int file, char regAddr) {
@@ -29,6 +30,20 @@ void axp_write(int file, char regAddr, char regValue) {
   if (write(file, buf, 2) != 2) {
     perror("Failed to write to the device");
   }
+}
+
+void check_battery_level(int file) {
+  char regValue = axp_read(file, BATT_L_REG); 
+
+  if (regValue == -1) {
+    return;
+  }
+
+  int battery_calculated_correctly = (regValue >> 7) & 0x01;
+  int battery_level = regValue & 0x7F; 
+
+  printf("Battery calculated correctly: %s\n", battery_calculated_correctly ? "Yes" : "No");
+  printf("Battery level: %d%%\n", battery_level);
 }
 
 void set_chg_led(int file, unsigned char val) { // gecko found this
@@ -156,8 +171,8 @@ int main(int argc, char *argv[]) {
     return -1;
   }
 
-  if (argc < 2 || (strcmp(argv[1], "shutdown") != 0 && strcmp(argv[1], "acin") != 0 && strcmp(argv[1], "charging") != 0 && strcmp(argv[1], "read") != 0 && strcmp(argv[1], "wifi") != 0 && strcmp(argv[1], "chgled") != 0)) {
-    fprintf(stderr, "Usage: %s [shutdown|acin|charging|read|wifi on|off|chgled 0|1|2]\n", argv[0]);
+  if (argc < 2 || (strcmp(argv[1], "shutdown") != 0 && strcmp(argv[1], "acin") != 0 && strcmp(argv[1], "charging") != 0 && strcmp(argv[1], "read") != 0 && strcmp(argv[1], "wifi") != 0 && strcmp(argv[1], "chgled") != 0 && strcmp(argv[1], "battery") != 0)) {
+    fprintf(stderr, "Usage: %s [shutdown|acin|charging|read|wifi on|off|chgled 0|1|2|battery]\n", argv[0]);
     return -1;
   }
 
@@ -165,6 +180,8 @@ int main(int argc, char *argv[]) {
     send_shutdown_command(file);
   } else if (strcmp(argv[1], "acin") == 0) {
     check_acin_status(file);
+  } else if (strcmp(argv[1], "battery") == 0) {
+    check_battery_level(file);
   } else if (strcmp(argv[1], "charging") == 0) {
     check_charging_status(file);
   } else if (strcmp(argv[1], "wifi") == 0) {
