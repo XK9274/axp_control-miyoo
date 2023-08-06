@@ -6,6 +6,56 @@
 #include <string.h>
 #include <stdio.h>
 
+#define CHGLED_REG 0x32 // Shutdown, battery detection, CHGLED control
+#define ACIN_REG 0x48 // 48 IRQ status register 1 R/W 00H
+#define CHARGE_REG 0x49 // 49 IRQ status register 2 R/W 00H
+#define WIFI_REG 0x12 // ELDO2
+
+char axp_read(int file, char regAddr) {
+  char regValue;
+
+  if (write(file, &regAddr, 1) != 1 || read(file, &regValue, 1) != 1) {
+    perror("Failed to read from the device");
+    return -1;
+  }
+
+  return regValue;
+}
+
+void axp_write(int file, char regAddr, char regValue) {
+  char buf[2] = {regAddr, regValue};
+
+  if (write(file, buf, 2) != 2) {
+    perror("Failed to write to the device");
+  }
+}
+
+void set_chg_led(int file, unsigned char val) {
+    unsigned char current_val;
+    switch (val) {
+    case 2:
+        current_val = axp_read(file, CHGLED_REG);
+        current_val |= 0b1000;  // turn on bit 3
+        axp_write(file, CHGLED_REG, current_val);
+        break;
+
+    case 1:
+        current_val = axp_read(file, CHGLED_REG);
+        current_val &= ~0b1000; // turn off bit 3
+        current_val |= 0b110000; // turn on bits 4,5
+        axp_write(file, CHGLED_REG, current_val);
+        break;
+
+    case 0:
+        current_val = axp_read(file, CHGLED_REG);
+        current_val &= ~0b111000; // turn off bits 3,4,5
+        axp_write(file, CHGLED_REG, current_val);
+        break;
+    default:
+        break;
+    }
+}
+
 void read_all_registers(int file) { // pulled a bunch of registers off the axp document
   char registers[] = {
   0x00, 0x01, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 
@@ -39,57 +89,46 @@ void read_all_registers(int file) { // pulled a bunch of registers off the axp d
 }
 
 void send_shutdown_command(int file) { // shutdown
-  char regAddr = 0x32;
-  char regValue;
-  
-  if (write(file, &regAddr, 1) != 1 || read(file, &regValue, 1) != 1) {
-    perror("Failed to read from the device");
+  unsigned char regValue = axp_read(file, CHGLED_REG);
+
+  if (regValue == -1) {
     return;
   }
   
   regValue |= (1 << 7);
-  char buf[2] = {regAddr, regValue};
-  if (write(file, buf, 2) != 2) {
-    perror("Failed to write to the device");
-    return;
-  }
-  
+
+  axp_write(file, CHGLED_REG, regValue);
+
   printf("Sent shutdown command to AXP223\n");
 }
 
 void check_acin_status(int file) { // checks if pwr cable is plugged in
-  char regAddr = 0x48;
-  char regValue;
-  
-  if (write(file, &regAddr, 1) != 1 || read(file, &regValue, 1) != 1) {
-    perror("Failed to read from the device");
+  char regValue = axp_read(file, ACIN_REG);
+
+  if (regValue == -1) {
     return;
   }
-  
+
   int acinPluggedIn = (regValue >> 6) & 0x01;
   printf("ACIN is %splugged in\n", acinPluggedIn ? "" : "not ");
 }
 
 void check_charging_status(int file) { // checks if we're charging or not
-  char regAddr = 0x49;
-  char regValue;
-  
-  if (write(file, &regAddr, 1) != 1 || read(file, &regValue, 1) != 1) {
-    perror("Failed to read from the device");
+  char regValue = axp_read(file, CHARGE_REG);
+
+  if (regValue == -1) {
     return;
   }
-  
+
   int charging = (regValue >> 3) & 0x01;
   printf("Charging status: %s\n", charging ? "Charging" : "Not Charging");
 }
 
 
 void set_wifi(int file, int wifi_on) { // wifi control registers courtesy of gecko
-  char register_address = 0x12;
-  char value;
-  
-  if (write(file, &register_address, 1) != 1 || read(file, &value, 1) != 1) {
-    perror("Failed to read from the device");
+  char value = axp_read(file, WIFI_REG);
+
+  if (value == -1) {
     return;
   }
 
@@ -99,11 +138,7 @@ void set_wifi(int file, int wifi_on) { // wifi control registers courtesy of gec
     value = value & ~0x18;
   }
 
-  char buf[2] = { register_address, value };
-  if (write(file, buf, 2) != 2) {
-    perror("Failed to write to the device");
-    return;
-  }
+  axp_write(file, WIFI_REG, value);
 
   printf("WiFi %s\n", wifi_on ? "enabled" : "disabled");
 }
