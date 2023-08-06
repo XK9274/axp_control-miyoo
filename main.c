@@ -4,24 +4,21 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 #include <string.h>
-
 #include <stdio.h>
 
-void set_wifi(int file, int wifi_on) {
+void set_wifi(int file, int wifi_on) { // wifi control registers courtesy of gecko
   char register_address = 0x12;
   char value;
   
-  // Read the value from address 0x12
   if (write(file, &register_address, 1) != 1 || read(file, &value, 1) != 1) {
     perror("Failed to read from the device");
     return;
   }
 
-  // Modify the value based on the wifi_on flag
   if (wifi_on) {
-    value = value | 0x18; // Logical OR to enable WiFi
+    value = value | 0x18;
   } else {
-    value = value & ~0x18; // Logical AND with the complement of 0x18 to disable WiFi
+    value = value & ~0x18;
   }
 
   char buf[2] = { register_address, value };
@@ -55,9 +52,9 @@ void read_all_registers(int file) { // pulled a bunch of registers off the axp d
 
     printf("Register 0x%02X: 0x%02X\n", regAddr, regValue);
     printf("  Bits: ");
-    for (int j = 0; j < 5; j++) { // read up to 5 bits (0 - 4) 
+    for (int j = 0; j < 7; j++) { // read up to 5 bits (0 - 4) 
       printf("%d", (regValue >> j) & 0x01);
-      if (j < 4) {
+      if (j < 7) {
         printf(", ");
       }
     }
@@ -104,6 +101,7 @@ int main(int argc, char *argv[]) {
       close(tmp_stdout);
     }
   }
+  
   
   if (strcmp(argv[1], "wifi") == 0) {
     if (argc < 3) {
